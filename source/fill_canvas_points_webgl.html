@@ -1,0 +1,364 @@
+<html>
+<head>
+  <title>Rendering primitives</title>
+  <link rel="shortcut icon" type="image/png" href="../common/images/favicon.png" />
+
+  <!-- libraries -->
+  <link rel="stylesheet" href="../common/lib/normalize.css">
+  <script type="text/javascript" src="../common/lib/dat.gui.js"></script>
+
+  <!-- modules -->
+  <script type="text/javascript" src="../common/js/utils.js"></script>
+
+  <!-- vertex shader -->
+  <script id="vertex-shader" type="x-shader/x-vertex">
+    #version 300 es
+    precision mediump float;
+
+    in vec3 aVertexPosition;
+    in vec3 aVertexColor;
+    smooth out vec4 vColor;
+
+    void main(void) {
+      vec4 pos = vec4(aVertexPosition,1.0);
+      gl_PointSize = 8.0;
+      gl_Position = pos;
+      vColor= vec4(aVertexColor,1.0);
+    }
+  </script>
+
+  <!-- fragment shader -->
+  <script id="fragment-shader" type="x-shader/x-fragment">
+    #version 300 es
+    precision mediump float;
+    in vec4 vColor;
+    out vec4 fragColor;
+
+    void main(void) {
+
+      fragColor = vColor;
+    }
+  </script>
+
+  <script type="text/javascript">
+
+
+   //Describes a point list data structure
+   class PointList{
+        constructor(){
+            this._list = []
+        }
+
+        get size(){
+            return this._list.length;
+        }
+
+        get list(){
+            return this._list;
+        }
+
+        push(point){
+            this._list.push(point);
+        }
+
+        randomFill(n){
+            var w = canvas.width;
+            var h = canvas.height;
+
+            var i;
+            for (i=0;i<n;i++){
+                var x = Math.floor(Math.random() * w);
+                var y = Math.floor(Math.random() * h); 
+
+                var r = Math.floor(Math.random()*255);
+                var g = Math.floor(Math.random()*255);
+                var b = Math.floor(Math.random()*255);
+                var color = new Color(r,g,b,1);
+                var point = new Point(x,y,8,color);
+      
+                this.push(point);
+            }
+        }
+
+    }
+
+
+    //Represents a color
+    class Color{
+        constructor (r,g,b,a){
+            this._r = r;
+            this._g = g;
+            this._b = b;
+            this._a = a;
+        }
+    
+        get r(){
+            return this._r;
+        }
+
+        set r(r){
+            this._r = r;
+        }
+
+        get g(){
+            return this._g;
+        }
+
+        set g(g){
+            this._g = g;
+        }   
+
+        get b(){
+            return this._b;
+        }
+        set b(b){
+            this._b = b;
+        }
+
+        get a(){
+            return this._a;
+        }
+        set a(a){
+            this._a = a;
+        }
+
+
+    }
+
+
+    //Represents a point
+    class Point{
+        constructor (x,y,size,color){
+            this._x = x;
+            this._y = y;
+            this._size = size;
+            this._color = color;
+        }
+
+        get x(){
+            return this._x;
+        }
+
+        get y(){
+            return this._y;
+        }
+
+        set x(_x){
+            this._x = x;
+        }
+
+        set y(_y){
+            this._y = y;
+        }
+
+        get size(){
+            return this._size;
+        }
+
+        set size(_s){
+            this._size = s;
+        }
+
+        get color(){
+            return this._color;
+        }
+
+        set color(color){
+            this._color = color;
+        }
+
+    }
+
+
+
+
+    'use strict';
+
+    let gl,
+      canvas,
+      program,
+      indices,
+      vertices,
+      colors,
+      pointsVAO,
+      pointsVertexBuffer,
+      pointsColorBuffer,
+      pointsIndexBuffer,
+      pointList,
+      renderingMode = 'POINTS';
+
+    function getShader(id) {
+      const script = document.getElementById(id);
+      const shaderString = script.text.trim();
+
+      let shader;
+      if (script.type === 'x-shader/x-vertex') {
+        shader = gl.createShader(gl.VERTEX_SHADER);
+      }
+      else if (script.type === 'x-shader/x-fragment') {
+        shader = gl.createShader(gl.FRAGMENT_SHADER);
+      }
+      else {
+        return null;
+      }
+
+      gl.shaderSource(shader, shaderString);
+      gl.compileShader(shader);
+
+      if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+        console.error(gl.getShaderInfoLog(shader));
+        return null;
+      }
+
+      return shader;
+    }
+
+    function initProgram() {
+      const vertexShader = getShader('vertex-shader');
+      const fragmentShader = getShader('fragment-shader');
+
+      program = gl.createProgram();
+      gl.attachShader(program, vertexShader);
+      gl.attachShader(program, fragmentShader);
+      gl.linkProgram(program);
+
+      if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+        console.error('Could not initialize shaders');
+      }
+
+      gl.useProgram(program);
+
+      program.aVertexPosition = gl.getAttribLocation(program, 'aVertexPosition');
+      program.aVertexColor = gl.getAttribLocation(program,'aVertexColor');
+    }
+
+    function initBuffers() {
+
+
+      var i;
+    /*  vertices = [0.5,0.5,0.0,
+                  -0.5,0.0,0.0,
+                  0.5,-0.5,0.0];
+      colors = [1.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,1.0];
+      indices = [0,1,2];*/
+
+
+      vertices = [];
+      colors = [];
+      indices = [];
+      
+      for (i=0;i<pointList.size;i++){
+        //Get a point
+        point = pointList.list[i];
+        var x = point.x-Math.round(point.size/2.0);
+        var y = point.y-Math.round(point.size/2.0);
+        var z = 0;
+        x = 2*(canvas.width-x)/canvas.width-1;
+        y = 2*(canvas.height-y)/canvas.height-1;
+        var r = point.color.r/255;
+        var g = point.color.g/255;
+        var b = point.color.b/255;
+
+        vertices.push(x);
+        vertices.push(y);
+        vertices.push(z);
+
+        colors.push(r);
+        colors.push(g);
+        colors.push(b);
+
+        indices.push(i);
+      }
+
+
+      // Create VAO
+      pointsVAO = gl.createVertexArray();
+
+      // Bind VAO
+      gl.bindVertexArray(pointsVAO);
+
+      const pointsVertexBuffer = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, pointsVertexBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+      // Provide instructions to VAO
+      gl.vertexAttribPointer(program.aVertexPosition, 3, gl.FLOAT, false, 0, 0);
+      gl.enableVertexAttribArray(program.aVertexPosition);
+
+
+      const pointsColorBuffer = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, pointsColorBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors), gl.STATIC_DRAW);
+      // Provide instructions to VAO
+      gl.vertexAttribPointer(program.aVertexColor, 3, gl.FLOAT, false, 0, 0);
+      gl.enableVertexAttribArray(program.aVertexColor);
+
+      pointsIndexBuffer = gl.createBuffer();
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, pointsIndexBuffer);
+      gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
+
+      // Clean
+      gl.bindVertexArray(null);
+      gl.bindBuffer(gl.ARRAY_BUFFER, null);
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+    }
+
+    function draw() {
+      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+      gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+
+      // Bind VAO
+      gl.bindVertexArray(pointsVAO);
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, pointsIndexBuffer);
+      gl.drawElements(gl.POINTS, indices.length, gl.UNSIGNED_SHORT, 0);
+ 
+
+      // Clean
+      gl.bindVertexArray(null);
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+    }
+
+    function render() {
+      requestAnimationFrame(render);
+      draw();
+    }
+
+    function init() {
+      canvas = document.getElementById("webgl-canvas");
+      if (!canvas){
+        alert("canvas could no be obtained");
+      }
+      //canvas = utils.getCanvas('webgl-canvas');
+      //canvas.width = window.innerWidth;
+      //canvas.height = window.innerHeight;
+
+      //gl = utils.getGLContext(canvas);
+      gl = canvas.getContext('webgl2');
+      if (!gl){
+        alert("no webgl-context could be obtained");
+      }
+      
+      gl.clearColor(0.7, 0.7, 0.9, 1.0);
+      gl.enable(gl.DEPTH_TEST);
+
+      initProgram();
+      pointList = new PointList();
+      pointList.randomFill(20);
+      initBuffers();
+      render();
+
+    }
+
+    window.onload = init;
+
+  
+  </script>
+</head>
+
+<body>
+
+  <canvas id="webgl-canvas" width="512" height="512">
+    Your browser does not support the HTML5 canvas element.
+  </canvas>
+
+</body>
+</html>
